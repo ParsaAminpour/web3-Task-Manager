@@ -1,81 +1,41 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0; 
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+pragma solidity ^0.8.0;
+import "./Task.sol";
 
-contract Task is Ownable{
-    using Counters for uint;
+contract TaskFactory {    
+    Task[] private tasks_list;
+    string public task_detail;
+   
+    event failed_task_creating(string indexed fallback_msg);
+    event task_created(string indexed result);
+    event task_deleted(string indexed task_info_, uint indexed task_index_);
+    function create_task(string memory task_info_) public returns(Task task_return_){
+        try new Task(task_info_) {
+            emit task_created("Task created successfully");
+            Task task_contract = new Task(task_info_);
+            task_return_ = task_contract;
 
-    enum Status{COMPLETED,PENDING,CANCELED}
-    Status public status_enum;
-
-    struct TaskStruct{
-        string task; 
-        bool status; uint time; 
+        } catch Error(string memory fallback_){
+            emit failed_task_creating(fallback_);
+        }
     }
-    TaskStruct public task_struct;
-
-    constructor(string memory _task) {
-        require(get_string_len(_task) > 0, "task detail is invalid");
-        task_struct.task = _task;
-        task_struct.status = false;
-        status_enum = Status.PENDING; //defualt is pending
-        task_struct.time = block.timestamp;
-    }
-
-    function get_string_len(string memory s) public pure returns (uint256) {
-        uint256 len;
-        uint256 i = 0;
-        uint256 bytelength = bytes(s).length;
-
-        for (len = 0; i < bytelength; len++) {
-            bytes1 b = bytes(s)[i];
-            unchecked{
-                b < 0x80 ? ++i
-                    : b < 0xE0 ? i += 2
-                        : b < 0xF0 ? i+=3
-                            : b < 0xF8 ? i += 4
-                                : b < 0xFC ? i+= 5
-                                    : i += 6;     }
-            }
-        return len;
+    function assign_created_contract(string memory your_task_info_) public returns(bool success_) {
+        uint task_length_before_creating = tasks_list.length;
+        Task task = create_task(your_task_info_);
+        tasks_list.push(task);
+        require(task_length_before_creating <= tasks_list.length, "Somethign went wrong in task_list length");
+        success_ = true;
     }
 
-    // change the task function
-    function change_task_info(string memory new_task) external onlyOwner returns(string memory new_task_) {
-        require(get_string_len(new_task) != uint256(0));
-
-        task_struct.task = new_task;
-        new_task_ = task_struct.task;
-    }
-    // change status to COMPLETED -> make task_struct.status:true
-    function complete_task() external onlyOwner returns(bool new_status_) {
-        require(task_struct.status == false, "The task has already cmopleted before");
-        task_struct.status = true;
-        status_enum = Status.COMPLETED;
-        require(new_status_ && status_enum == Status.COMPLETED, "An error occured in complete_task function");
-        new_status_ = true;
-    }
-
-    function cancel_task() external onlyOwner returns(bool new_status_) {
-        require(status_enum == Status.PENDING && task_struct.status == false,
-            "The task has already completed or canceled before");
+    function deleting_created_task(uint index_) public {
+        uint len = tasks_list.length;
+        require(len >= index_, "index is invalid");
         
-        status_enum = Status.CANCELED;
-        require(status_enum == Status.CANCELED);
-        new_status_ = true;
+        delete tasks_list[index_];
+        
+        for(uint i=len; i<len-1; i++) {
+            tasks_list[i] = tasks_list[i-1];
+        }
+        tasks_list.pop();
     }
-    
-    function status_bare_metal() public view returns(string memory status_return_) {
-        status_return_ = status_enum == Status.COMPLETED  ? "completed" 
-            : status_enum == Status.PENDING ? "pending"
-                : "canceled";
-    }   
-
-    function task_data() public view returns(string memory task_, bool status_, uint time_) {
-        task_ = task_struct.task;
-        status_ = task_struct.status;
-        time_ = task_struct.time;
-    }
-
 }
