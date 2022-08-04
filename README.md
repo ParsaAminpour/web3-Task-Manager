@@ -1,13 +1,13 @@
-# Sample Hardhat Project
+# Interacting with Hardhat Project
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+This project demonstrates guide of Hardhat interaction. 
+This project is **(NOT NOW)** a hardhat project with reactjs as front-end 
+but it's NOT already added in here
 
-Try running some of the following tasks:
-
+### H3 for just running smart contract use:
 ```shell
-npx hardhat help
-npx hardhat test
+npx hardhat compile
 GAS_REPORT=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.js
+npx hardhat node -> >for indicating accounts
+npx hardhat run scripts/<deploy_js_file>.js >for deploying project
 ```
