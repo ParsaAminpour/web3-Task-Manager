@@ -8,6 +8,6 @@ but it's NOT already added in here
 ```shell
 npx hardhat compile
 GAS_REPORT=true npx hardhat test
-npx hardhat node -> >for indicating accounts
-npx hardhat run scripts/<deploy_js_file>.js >for deploying project
+npx hardhat node -> for indicating accounts
+npx hardhat run scripts/<deploy_js_file>.js ->for deploying project
 ```
