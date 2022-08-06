@@ -16,7 +16,7 @@ contract Task is Ownable{
     TaskStruct public task_struct;
 
     constructor(string memory _task) {
-        require(get_string_len(_task) > 0, "task detail is invalid");
+        // require(get_string_len(_task) > 0, "task detail is invalid");
         task_struct.task = _task;
         task_struct.status = false;
         status_enum = Status.PENDING; //defualt is pending
@@ -49,7 +49,7 @@ contract Task is Ownable{
         new_task_ = task_struct.task;
     }
     // change status to COMPLETED -> make task_struct.status:true
-    function complete_task() external onlyOwner returns(bool new_status_) {
+    function compelete_task() external onlyOwner returns(bool new_status_) {
         require(task_struct.status == false, "The task has already cmopleted before");
         task_struct.status = true;
         status_enum = Status.COMPLETED;
