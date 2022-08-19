@@ -26,16 +26,13 @@ contract TaskFactory {
         require(task_length_before_creating <= tasks_list.length, "Somethign went wrong in task_list length");
         success_ = true;
     }
-
+    
     function deleting_created_task(uint index_) public {
+        require(index_ != 0, "the index is invalid");
         uint len = tasks_list.length;
-        require(len >= index_, "index is invalid");
         
-        delete tasks_list[index_];
-        
-        for(uint i=len; i<len-1; i++) {
-            tasks_list[i] = tasks_list[i-1];
-        }
+        tasks_list[index_] = tasks_list[len-1];
         tasks_list.pop();
+        assert(task_list.length == len -1);
     }
 }
