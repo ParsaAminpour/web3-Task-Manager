@@ -4,3 +4,6 @@
 [submodule "TestContract/lib/openzeppelin-contracts"]
 	path = TestContract/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "TestContract/lib/solmate"]
+	path = TestContract/lib/solmate
+	url = https://github.com/rari-capital/solmate
