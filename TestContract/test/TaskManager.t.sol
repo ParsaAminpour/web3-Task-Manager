@@ -9,6 +9,15 @@ contract TaskManagerTest is Test {
 
     function setUp() public {
         manager = new TaskManager('programming');
-        
+    }
+
+    function TestCreateTask() public {
+        vm.startPrank(address(1));
+
+        bool result = manager.CreateTask("Writing test units", block.timestamp);
+        // TaskDetails  new_task = manager.TaskOwnership[address(1)];
+
+        // assertEq(manager.TaskOwnership[address(1)].task_owner = address(1));
+        assertEq(result, true);
     }
 }

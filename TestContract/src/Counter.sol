@@ -11,7 +11,7 @@ contract Counter {
     function increment() public {
         number++;
     }
-    
+
     function dec() public {
         number--;
     }

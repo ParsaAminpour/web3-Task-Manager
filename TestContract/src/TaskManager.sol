@@ -2,64 +2,146 @@
 pragma solidity ^0.8.13;
 
 import "openzeppelin/utils/math/Math.sol";
+import "openzeppelin/utils/cryptography/SignatureChecker.sol";
+import "openzeppelin/security/ReentrancyGuard.sol";
+import "openzeppelin/utils/math/SafeCast.sol";
 import "openzeppelin/utils/Address.sol";
 import "openzeppelin/utils/cryptography/ECDSA.sol";
 import "openzeppelin/access/AccessControl.sol";
 import "openzeppelin/access/Ownable.sol";
 import "openzeppelin/utils/Strings.sol";
+import "forge-std/console.sol";
 
-contract TaskManager is Ownable {
-    using Math for uint;
+contract TaskManager is Ownable, ReentrancyGuard {
+    using SafeCast for uint256;
+    using Math for uint256;
     using Address for address;
     using Strings for string;
+    using SignatureChecker for *;
 
     string public TaskTitle;
 
-    enum TASK_STATUS { COMPLETED, PENDING, CANCELED }
+    enum TASK_STATUS {
+        COMPLETED,
+        PENDING,
+        CANCELED
+    }
 
     struct TaskDetails {
-        address task_owner; uint task_id; // id will fenerate from VRF
-        string task_message; uint task_created_date;
-        uint task_complete_period; TASK_STATUS task_status;
+        address task_owner;
+        uint256 task_id; // id will fenerate from VRF
+        string task_message;
+        uint256 task_created_date;
+        uint256 task_complete_period;
+        TASK_STATUS task_status;
     }
 
     mapping(address => mapping(address => TaskDetails)) public TaskGrant;
-    mapping(address => TaskDetails) public TaskOwnership;
+    mapping(uint => TaskDetails) public IdOfTasks;
     mapping(address => TaskDetails[]) public TasksOwnershipList;
-    mapping(address => uint) public TaskOwnerBudget;
-
-    event TaskCreated(address indexed owner, uint indexed task_id_created);
-    event TaskRemoved(address indexed owner, uint indexed task_id_removed);
-    event TaskUpdated(address indexed owner, uint indexed task_id_updated);
-    event OwnerRewarded(address indexed owner, uint indexed task_id_rewarded, uint indexed amount_rewarded);
+    mapping(address => uint256) public TaskOwnerBudget;
+    mapping(uint => bool) public TaskIdActivate;
 
 
-
+    event TaskCreated(address indexed owner, uint256 indexed task_id_created);
+    event TaskRemoved(address indexed owner, uint256 indexed task_id_removed);
+    event TaskUpdated(address indexed owner, uint256 indexed task_id_updated);
+    event OwnerRewarded(address indexed owner, uint256 indexed task_id_rewarded, uint256 indexed amount_rewarded);
 
     constructor(string memory _task_title) {
         require(!(_task_title.equal("")), "invalid Task Title");
         TaskTitle = _task_title;
     }
 
-    function CreateTask(string memory _task_msg, uint _task_completed_date) external returns(bool created){
+    modifier onlyTaskOwner(uint _task_id) {
+        require(IdOfTasks[_task_id].task_owner == msg.sender, "You are NOT the task owner");
+        _;
+    }
+
+    function CreateTask(string memory _task_msg, uint256 _task_completed_date) external returns (bool created) {
         require(!(_task_msg.equal("") && _task_completed_date == block.timestamp), "invalid values inserted");
-        
+
+        uint task_id_gen = uint256(keccak256(abi.encodePacked(msg.sender)));
         TaskDetails memory new_task = TaskDetails(
-            msg.sender, uint(keccak256(abi.encodePacked(msg.sender))), _task_msg,
-            block.timestamp, _task_completed_date, TASK_STATUS.PENDING
+            msg.sender,
+            task_id_gen,
+            _task_msg,
+            block.timestamp,
+            _task_completed_date,
+            TASK_STATUS.PENDING
         );
 
-        TaskOwnership[new_task.task_owner] = new_task;
         TasksOwnershipList[new_task.task_owner].push(new_task);
+        TaskIdActivate[task_id_gen] = true;
 
         emit TaskCreated(new_task.task_owner, new_task.task_id);
-        
+
         created = true;
     }
 
-    function removeTask() external returns(bool removed){}
 
-    function updateTask() external returns(bool updated){}
+    function _FindTaskFromTaskOwnershipList(uint _task_id_for_looking) internal view returns(uint) {
+        require(_task_id_for_looking < TasksOwnershipList[msg.sender].length, "invalid task id");
 
-    function GetTaskCompletedReward() external returns(bool rewarded){}
+        for(uint j=0; j < TasksOwnershipList[msg.sender].length; j++) {
+            if(TasksOwnershipList[msg.sender][j].task_id == _task_id_for_looking) return j;
+        }
+        revert("Not found");
+    }
+
+
+    function removeTask(uint _task_id_for_remove) external onlyTaskOwner(_task_id_for_remove) returns(bool removed) {
+        require(TaskIdActivate[_task_id_for_remove], "Task has already canceled");
+        TaskDetails memory removing_task = IdOfTasks[_task_id_for_remove];
+        require(removing_task.task_status != TASK_STATUS.CANCELED, "task has already canceled");
+
+        removing_task.task_status = TASK_STATUS.CANCELED;
+
+        uint task_index = _FindTaskFromTaskOwnershipList(_task_id_for_remove);
+        TasksOwnershipList[msg.sender][task_index] = TasksOwnershipList[msg.sender][TasksOwnershipList[msg.sender].length-1];
+        TasksOwnershipList[msg.sender].pop();
+
+        emit TaskRemoved(removing_task.task_owner, removing_task.task_id);
+        removed = true;
+    }
+
+
+    /**NOTE: for passing value input if you don't want to update, pass zero value if that type */
+    function updateTask(string memory _new_msg, uint _new_time, uint _task_id_for_update) external onlyTaskOwner(_task_id_for_update) returns(bool updated) {
+        TaskDetails storage updating_task = IdOfTasks[_task_id_for_update];
+        uint task_idx = _FindTaskFromTaskOwnershipList(_task_id_for_update);
+
+        require(!(updating_task.task_message.equal(_new_msg)), "message not new");
+        require(_new_time == updating_task.task_complete_period, "complete timestamp is not new");
+        require(_new_time != block.timestamp || _new_time > block.timestamp, "new time is not for future");
+
+        if(!(_new_msg.equal(""))) {
+            updating_task.task_message = _new_msg;
+            TasksOwnershipList[msg.sender][task_idx].task_message = _new_msg;
+            updated=true;
+
+        } else if(!(_new_time != 0 && _new_time == block.timestamp)) {
+            updating_task.task_complete_period = _new_time;
+            TasksOwnershipList[msg.sender][task_idx].task_complete_period = _new_time;
+            updated=true;
+
+        } else if(!(_new_msg.equal("")) && !(_new_time != 0 && _new_time == block.timestamp)) {
+            updating_task.task_message = _new_msg;
+            TasksOwnershipList[msg.sender][task_idx].task_message = _new_msg;
+            updating_task.task_complete_period = _new_time;
+            TasksOwnershipList[msg.sender][task_idx].task_complete_period = _new_time;
+            updated=true;
+        }
+
+        updated = false;
+        revert("There is no new value for update");
+    }
+
+    function CompleteTask() external returns(bool completed) {
+
+    }
+
+    function _GetTaskCompletedReward() internal nonReentrant returns (bool rewarded) {}
 }
+
+contract GenerateRandomness {}
