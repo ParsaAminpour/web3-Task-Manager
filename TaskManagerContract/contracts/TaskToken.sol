@@ -22,11 +22,7 @@ contract TaskToken is ERC20, ERC20Burnable, Pausable, AccessControl {
         _unpause();
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount)
-        internal
-        whenNotPaused
-        override
-    {
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override whenNotPaused {
         super._beforeTokenTransfer(from, to, amount);
     }
 }

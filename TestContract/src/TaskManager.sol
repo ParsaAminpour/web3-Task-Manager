@@ -11,8 +11,11 @@ import "openzeppelin/access/AccessControl.sol";
 import "openzeppelin/access/Ownable.sol";
 import "openzeppelin/utils/Strings.sol";
 import "forge-std/console.sol";
+import "openzeppelin/utils/math/SafeMath.sol";
+import "./TaskToken.sol";
 
-contract TaskManager is Ownable, ReentrancyGuard {
+contract TaskManager is Ownable, ReentrancyGuard, TaskToken  {
+    using SafeMath for uint256;
     using SafeCast for uint256;
     using Math for uint256;
     using Address for address;
@@ -20,6 +23,9 @@ contract TaskManager is Ownable, ReentrancyGuard {
     using SignatureChecker for *;
 
     string public TaskTitle;
+    TaskToken public token;
+    address public immutable OWNER;
+    uint public constant CONST_REWARD_AMOUNT = 10 * (10**18);
 
     enum TASK_STATUS {
         COMPLETED,
@@ -51,6 +57,8 @@ contract TaskManager is Ownable, ReentrancyGuard {
     constructor(string memory _task_title) {
         require(!(_task_title.equal("")), "invalid Task Title");
         TaskTitle = _task_title;
+        token = new TaskToken();
+        OWNER = msg.sender;
     }
 
     modifier onlyTaskOwner(uint _task_id) {
@@ -137,11 +145,19 @@ contract TaskManager is Ownable, ReentrancyGuard {
         revert("There is no new value for update");
     }
 
-    function CompleteTask() external returns(bool completed) {
+    // function CompleteTask(uint _task_id_for_complete) external onlyTaskOwner(_task_id_for_complete) returns(bool completed) {
+    //     require(TaskIdActivate[_task_id_for_complete] == true, "Task has already canceled");
 
+    // }
+
+    function _GetTaskCompletedReward(address _to, uint _amount) internal onlyOwner nonReentrant returns (bool rewarded) {
+        require(_to != address(0) && _amount > 0, "invalid inputs");
+        TaskOwnerBudget[msg.sender] = TaskOwnerBudget[msg.sender].add(CONST_REWARD_AMOUNT);
+
+        bool success = token.transferFrom(OWNER, _to, _amount);
+        require(success, "Transaction failed or occured to some tx problems");
+        rewarded = success;
     }
-
-    function _GetTaskCompletedReward() internal nonReentrant returns (bool rewarded) {}
 }
 
 contract GenerateRandomness {}
