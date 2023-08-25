@@ -13,7 +13,8 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "./Signature.sol";
+import { MessageHashUtils} from "./Signature.sol";
+import { Signature } from "./Signature.sol";
 import "./TaskToken.sol";
 
     

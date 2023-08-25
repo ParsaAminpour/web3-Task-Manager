@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 library Signature {
     enum RecoverError {
@@ -22,9 +23,7 @@ library Signature {
             bytes32 r;
             bytes32 s;
             uint8 v;
-            // ecrecover takes the signature parameters, and the only way to get them
-            // currently is to use assembly.
-            /// @solidity memory-safe-assembly
+
             assembly {
                 r := mload(add(signature, 0x20))
                 s := mload(add(signature, 0x40))
@@ -91,6 +90,45 @@ library Signature {
             revert ECDSAInvalidSignatureLength(uint256(errorArg));
         } else if (error == RecoverError.InvalidSignatureS) {
             revert ECDSAInvalidSignatureS(errorArg);
+        }
+    }
+}
+
+
+
+library MessageHashUtils {
+
+    function toEthSignedMessageHash(bytes32 messageHash) internal pure returns (bytes32 digest) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, "\x19Ethereum Signed Message:\n32") // 32 is the bytes-length of messageHash
+            mstore(0x1c, messageHash) // 0x1c (28) is the length of the prefix
+            digest := keccak256(0x00, 0x3c) // 0x3c is the length of the prefix (0x1c) + messageHash (0x20)
+        }
+    }
+
+    function toEthSignedMessageHash(bytes memory message) internal pure returns (bytes32 digest) {
+        return
+            keccak256(bytes.concat("\x19Ethereum Signed Message:\n", bytes(Strings.toString(message.length)), message));
+    }
+
+
+    function toDataWithIntendedValidatorHash(
+        address validator,
+        bytes memory data
+    ) internal pure returns (bytes32 digest) {
+        return keccak256(abi.encodePacked(hex"19_00", validator, data));
+    }
+
+
+    function toTypedDataHash(bytes32 domainSeparator, bytes32 structHash) internal pure returns (bytes32 digest) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, hex"19_01")
+            mstore(add(ptr, 0x02), domainSeparator)
+            mstore(add(ptr, 0x22), structHash)
+            digest := keccak256(ptr, 0x42)
         }
     }
 }
