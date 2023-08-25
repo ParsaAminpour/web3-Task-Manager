@@ -13,11 +13,12 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "./Signature.sol";
 import "./TaskToken.sol";
 
     
 contract TaskManager is Ownable, ReentrancyGuard, TaskToken  {
-    using ECDSA for bytes32;
+    using Signature for bytes32;
     using SignatureChecker for bytes32;
     using SafeMath for uint256;
     using SafeCast for uint256;
