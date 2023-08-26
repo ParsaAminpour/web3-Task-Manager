@@ -99,19 +99,13 @@ library Signature {
 library MessageHashUtils {
 
     function toEthSignedMessageHash(bytes32 messageHash) internal pure returns (bytes32 digest) {
-        /// @solidity memory-safe-assembly
+        // memory-safe-assembly
         assembly {
             mstore(0x00, "\x19Ethereum Signed Message:\n32") // 32 is the bytes-length of messageHash
-            mstore(0x1c, messageHash) // 0x1c (28) is the length of the prefix
-            digest := keccak256(0x00, 0x3c) // 0x3c is the length of the prefix (0x1c) + messageHash (0x20)
+            mstore(0x1c, messageHash) // 0x1c (28) -> length of the prefix
+            digest := keccak256(0x00, 0x3c) // 0x3c -> length of the prefix (0x1c) + messageHash (0x20)
         }
     }
-
-    function toEthSignedMessageHash(bytes memory message) internal pure returns (bytes32 digest) {
-        return
-            keccak256(bytes.concat("\x19Ethereum Signed Message:\n", bytes(Strings.toString(message.length)), message));
-    }
-
 
     function toDataWithIntendedValidatorHash(
         address validator,
@@ -119,7 +113,6 @@ library MessageHashUtils {
     ) internal pure returns (bytes32 digest) {
         return keccak256(abi.encodePacked(hex"19_00", validator, data));
     }
-
 
     function toTypedDataHash(bytes32 domainSeparator, bytes32 structHash) internal pure returns (bytes32 digest) {
         /// @solidity memory-safe-assembly

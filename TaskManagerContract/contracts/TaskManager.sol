@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
-// import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -13,14 +13,15 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import { MessageHashUtils} from "./Signature.sol";
-import { Signature } from "./Signature.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
+import { MessageHashUtils } from "./Signature.sol";
+// import { Signature } from "./Signature.sol";
 import "./TaskToken.sol";
 
     
-contract TaskManager is Ownable, ReentrancyGuard, TaskToken  {
-    using Signature for bytes32;
+contract TaskManager is Ownable,ReentrancyGuard, TaskToken {
     using SignatureChecker for bytes32;
+    using MessageHashUtils for bytes32;
     using SafeMath for uint256;
     using SafeCast for uint256;
     using Math for uint256;
@@ -32,6 +33,7 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken  {
     TaskToken public token;
     address public immutable OWNER;
     uint public constant CONST_REWARD_AMOUNT = 10 * (10**18);
+
 
     enum TASK_STATUS {
         COMPLETED,
@@ -46,10 +48,12 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken  {
         uint256 task_created_date;
         uint256 task_complete_period;
         TASK_STATUS task_status;
+        bytes32 sign_msg;
     }
 
     mapping(address => mapping(address => TaskDetails)) public TaskGrant;
     mapping(uint => TaskDetails) public IdOfTasks;
+    mapping(bytes32 => address) private SignedMessageToOwner;
     mapping(address => TaskDetails[]) public TasksOwnershipList;
     mapping(address => uint256) public TaskOwnerBudget;
     mapping(uint => bool) public TaskIdActivate;
@@ -59,6 +63,7 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken  {
     event TaskRemoved(address indexed owner, uint256 indexed task_id_removed);
     event TaskUpdated(address indexed owner, uint256 indexed task_id_updated);
     event OwnerRewarded(address indexed owner, uint256 indexed task_id_rewarded, uint256 indexed amount_rewarded);
+    event SignedMessageGenerated(address indexed sign_owner, bytes32 indexed signed_message);
 
     constructor(string memory _task_title) {
         require(!(_task_title.equal("")), "invalid Task Title");
@@ -67,22 +72,43 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken  {
         OWNER = msg.sender;
     }
 
+
     modifier onlyTaskOwner(uint _task_id) {
         require(IdOfTasks[_task_id].task_owner == msg.sender, "You are NOT the task owner");
+
+        // Check signer verification
+        TaskDetails memory task_to_verify = IdOfTasks[_task_id];
+        bytes32 hashed_message_for_verify = _getHashValue(task_to_verify.task_message);
+        bytes32 signed_message_for_verify = task_to_verify.sign_msg;
+
+        bool is_sign_owner = SignatureChecker.isValidERC1271SignatureNow(
+            msg.sender, hashed_message_for_verify, abi.encodePacked(signed_message_for_verify));
         _;
     }
+
+
+    function _getHashValue(string memory _msg) internal view returns(bytes32 hashed) {
+        return keccak256(abi.encodePacked(_msg, msg.sender));
+    }
+
 
     function CreateTask(string memory _task_msg, uint256 _task_completed_date) external returns (bool created) {
         require(!(_task_msg.equal("") && _task_completed_date == block.timestamp), "invalid values inserted");
 
         uint task_id_gen = uint256(keccak256(abi.encodePacked(msg.sender)));
+
+        bytes32 hashed = _getHashValue(_task_msg);
+        bytes32 SignedMessageGen = hashed.toEthSignedMessageHash();
+        emit SignedMessageGenerated(msg.sender, SignedMessageGen);
+
         TaskDetails memory new_task = TaskDetails(
             msg.sender,
             task_id_gen,
             _task_msg,
             block.timestamp,
             _task_completed_date,
-            TASK_STATUS.PENDING
+            TASK_STATUS.PENDING,
+            SignedMessageGen
         );
 
         TasksOwnershipList[new_task.task_owner].push(new_task);
