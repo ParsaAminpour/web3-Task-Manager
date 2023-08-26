@@ -2,6 +2,8 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/Strings.sol";
+import  "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import  "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 library Signature {
     enum RecoverError {
@@ -123,5 +125,38 @@ library MessageHashUtils {
             mstore(add(ptr, 0x22), structHash)
             digest := keccak256(ptr, 0x42)
         }
+    }
+}
+
+
+/** NOTE: this contract will remove in the end of the project  */
+contract TestManager {
+    using MessageHashUtils for bytes32;
+    // using SignatureChecker for bytes32;
+    // using ECDSA for bytes32;
+
+    string public message_interface;
+
+    constructor(string memory _message) {
+        message_interface = _message;
+    }
+
+    function hashed() public view returns(bytes32) {
+        return keccak256(abi.encodePacked(message_interface, msg.sender));
+    }
+
+    function getSignedMessageg(bytes32 HashedMessage) public pure returns(bytes32) {
+        return HashedMessage.toEthSignedMessageHash();
+    }
+
+    function verification(bytes32 hash_for_verify, bytes32 sign_for_verify) public pure returns(address) {
+    }
+
+    function bytes32ToBytes(bytes32 input) public pure returns (bytes memory) {
+        bytes memory b = new bytes(32);
+        assembly {
+          mstore(add(b, 32), input) // set the bytes data
+        }
+        return b;
     }
 }

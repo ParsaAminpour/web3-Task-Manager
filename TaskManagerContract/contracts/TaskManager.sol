@@ -57,13 +57,16 @@ contract TaskManager is Ownable,ReentrancyGuard, TaskToken {
     mapping(address => TaskDetails[]) public TasksOwnershipList;
     mapping(address => uint256) public TaskOwnerBudget;
     mapping(uint => bool) public TaskIdActivate;
+    mapping(string => bool) public TaskMessageUsed;
 
+    address[] public blackList;
 
     event TaskCreated(address indexed owner, uint256 indexed task_id_created);
     event TaskRemoved(address indexed owner, uint256 indexed task_id_removed);
     event TaskUpdated(address indexed owner, uint256 indexed task_id_updated);
     event OwnerRewarded(address indexed owner, uint256 indexed task_id_rewarded, uint256 indexed amount_rewarded);
     event SignedMessageGenerated(address indexed sign_owner, bytes32 indexed signed_message);
+    event SignedMessageVerified(address indexed signer, bytes32 indexed signed_message);
 
     constructor(string memory _task_title) {
         require(!(_task_title.equal("")), "invalid Task Title");
@@ -72,32 +75,43 @@ contract TaskManager is Ownable,ReentrancyGuard, TaskToken {
         OWNER = msg.sender;
     }
 
-
-    modifier onlyTaskOwner(uint _task_id) {
-        require(IdOfTasks[_task_id].task_owner == msg.sender, "You are NOT the task owner");
-
-        // Check signer verification
-        TaskDetails memory task_to_verify = IdOfTasks[_task_id];
-        bytes32 hashed_message_for_verify = _getHashValue(task_to_verify.task_message);
-        bytes32 signed_message_for_verify = task_to_verify.sign_msg;
-
-        bool is_sign_owner = SignatureChecker.isValidERC1271SignatureNow(
-            msg.sender, hashed_message_for_verify, abi.encodePacked(signed_message_for_verify));
-        _;
-    }
-
-
-    function _getHashValue(string memory _msg) internal view returns(bytes32 hashed) {
+    function _getHashValue(address _owner, string memory _msg) internal view returns(bytes32 hashed) {
         return keccak256(abi.encodePacked(_msg, msg.sender));
     }
 
 
+    modifier onlyTaskOwner(uint _task_id, uint8 _v, bytes32 _r, bytes32 _s) {
+        require(IdOfTasks[_task_id].task_owner == msg.sender, "You are NOT the task owner");
+
+        // Check signer verification
+        TaskDetails memory task_to_verify = IdOfTasks[_task_id];
+
+        bytes32 hashed_message_for_verify = _getHashValue(msg.sender, task_to_verify.task_message);
+        bytes32 signed_message_for_verify = task_to_verify.sign_msg;
+
+        bytes32 verified_signer_message = hashed_message_for_verify.toEthSignedMessageHash();
+
+        address signer = ecrecover(verified_signer_message, _v, _r, _s);
+        
+        require(SignedMessageToOwner[verified_signer_message] == signer, "We have not your task sign");
+
+        if(signer == msg.sender && verified_signer_message == signed_message_for_verify) {
+            blackList.push(msg.sender);
+            revert("You are Not owner");
+        } else emit SignedMessageVerified(msg.sender, verified_signer_message);
+
+        _;
+    }
+
+
+
     function CreateTask(string memory _task_msg, uint256 _task_completed_date) external returns (bool created) {
         require(!(_task_msg.equal("") && _task_completed_date == block.timestamp), "invalid values inserted");
+        require(!(TaskMessageUsed[_task_msg]), "This message of task has already used");
 
         uint task_id_gen = uint256(keccak256(abi.encodePacked(msg.sender)));
 
-        bytes32 hashed = _getHashValue(_task_msg);
+        bytes32 hashed = _getHashValue(msg.sender, _task_msg);
         bytes32 SignedMessageGen = hashed.toEthSignedMessageHash();
         emit SignedMessageGenerated(msg.sender, SignedMessageGen);
 
@@ -130,7 +144,8 @@ contract TaskManager is Ownable,ReentrancyGuard, TaskToken {
     }
 
 
-    function removeTask(uint _task_id_for_remove) external onlyTaskOwner(_task_id_for_remove) returns(bool removed) {
+    /** NOTE: v, r, s will fetch via ethers js */
+    function removeTask(uint _task_id_for_remove, uint8 _v, bytes32 _r, bytes32 _s) external onlyTaskOwner(_task_id_for_remove, _v, _r, _s) returns(bool removed) {
         require(TaskIdActivate[_task_id_for_remove], "Task has already canceled");
         TaskDetails memory removing_task = IdOfTasks[_task_id_for_remove];
         require(removing_task.task_status != TASK_STATUS.CANCELED, "task has already canceled");
@@ -146,8 +161,11 @@ contract TaskManager is Ownable,ReentrancyGuard, TaskToken {
     }
 
 
+    /** NOTE: v, r, s will fetch via ethers js */
     /**NOTE: for passing value input if you don't want to update, pass zero value if that type */
-    function updateTask(string memory _new_msg, uint _new_time, uint _task_id_for_update) external onlyTaskOwner(_task_id_for_update) returns(bool updated) {
+    function updateTask(string memory _new_msg, uint _new_time, uint _task_id_for_update,uint8 _v, bytes32 _r, bytes32 _s) 
+        external onlyTaskOwner(_task_id_for_update,  _v, _r, _s) returns(bool updated) {
+
         TaskDetails storage updating_task = IdOfTasks[_task_id_for_update];
         uint task_idx = _FindTaskFromTaskOwnershipList(_task_id_for_update);
 
