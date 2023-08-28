@@ -195,10 +195,10 @@ contract TaskManager is Ownable,ReentrancyGuard, TaskToken {
         revert("There is no new value for update");
     }
 
-    // function CompleteTask(uint _task_id_for_complete) external onlyTaskOwner(_task_id_for_complete) returns(bool completed) {
-    //     require(TaskIdActivate[_task_id_for_complete] == true, "Task has already canceled");
+    function CompleteTask(uint _task_id_for_complete, uint8 _v, bytes32 _r, bytes32 _s) external onlyTaskOwner(_task_id_for_complete, _v, _r, _s) returns(bool completed) {
+        require(TaskIdActivate[_task_id_for_complete] == true, "Task has already canceled");
 
-    // }
+    }
 
     function _GetTaskCompletedReward(address _to, uint _amount) internal onlyOwner nonReentrant returns (bool rewarded) {
         require(_to != address(0) && _amount > 0, "invalid inputs");
