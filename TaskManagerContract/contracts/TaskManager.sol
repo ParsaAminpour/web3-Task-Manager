@@ -159,7 +159,7 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
     /**
      * NOTE: MetaMask message signature will fetch via ethers js
      */
-    function removeTask(uint256 _task_id_for_remove, bytes memory _metamask_sign_for_verifiy)
+    function removeTask(uint256 _task_id_for_remove, bytes memory _metamask_sign_for_verifiy, uint _remove_status)
         external
         onlyTaskOwner(_task_id_for_remove, _metamask_sign_for_verifiy)
         returns (bool removed)
@@ -169,8 +169,12 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
         require(removing_task.task_status != TASK_STATUS.CANCELED, "task has already canceled");
 
         /** MODIFICATIONS (Just for vitals data) */
-        removing_task.task_status = TASK_STATUS.CANCELED;
-
+        if(_remove_status == 1) {  // means remove for complete 
+            removing_task.task_status = TASK_STATUS.COMPLETED;
+        } else if(_remove_status == 0) { // means remove for revoke task
+            removing_task.task_status = TASK_STATUS.CANCELED;
+        } 
+        
         TaskIdActivate[removing_task.task_id] = false;
 
         uint256 task_index = _FindTaskFromTaskOwnershipList(_task_id_for_remove);
@@ -234,7 +238,7 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
         require(TaskIdActivate[_task_id_for_complete] == true, "Task has already canceled");
 
 
-        bool removed = this.removeTask(_task_id_for_complete, _metamask_task_signature);
+        bool removed = this.removeTask(_task_id_for_complete, _metamask_task_signature, 1);
         // rewarding to the owner
         bool rewarded = _GetTaskCompletedReward(msg.sender, 10);
         require(removed && rewarded, "Something went wrong in reward function");
