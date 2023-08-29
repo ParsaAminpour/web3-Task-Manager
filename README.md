@@ -61,7 +61,7 @@ python3 setup.py install
 
 ## Authors
 
-- [@octokatherine](https://www.github.com/ParsaAminpour)
+- [@Parsa Aminpour](https://www.github.com/ParsaAminpour)
 
 
 ## License
