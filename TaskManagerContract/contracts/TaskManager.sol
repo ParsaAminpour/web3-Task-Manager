@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.13;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
@@ -15,11 +15,12 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import {MessageHashUtils} from "./Signature.sol";
-// import { Signature } from "./Signature.sol";
+import { Signature } from "./Signature.sol";
 import "./TaskToken.sol";
 
 contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
-    using SignatureChecker for bytes32;
+    // using SignatureChecker for bytes32;
+    using Signature for bytes32;
     using MessageHashUtils for bytes32;
     using SafeMath for uint256;
     using SafeCast for uint256;
@@ -72,34 +73,45 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
         OWNER = msg.sender;
     }
 
-    function _getHashValue(address _owner, string memory _msg) internal view returns (bytes32 hashed) {
-        return keccak256(abi.encodePacked(_msg, _owner));
+    function _getHashValue(address _owner, uint _tsk_id) internal pure returns (bytes32 hashed) {
+        return keccak256(abi.encodePacked(_tsk_id, _owner));
     }
 
-    modifier onlyTaskOwner(uint256 _task_id, uint8 _v, bytes32 _r, bytes32 _s) {
+    function _split(bytes memory _metamask_signature) 
+    internal 
+    pure 
+    returns(bytes32 r, bytes32 s, uint8 v) {
+        // require(!(_metamask_signature == bytes(0)), "invalid data inserted");
+
+        assembly {
+            r := mload(add(_metamask_signature, 0x20))
+            s := mload(add(_metamask_signature, 0x40))
+            v := byte(0, mload(add(_metamask_signature, 0x60)))
+        }
+    }
+
+
+    modifier onlyTaskOwner(uint256 _task_id, bytes memory _metamask_sign) {
         require(IdOfTasks[_task_id].task_owner == msg.sender, "You are NOT the task owner");
 
         // Check signer verification
-        TaskDetails memory task_to_verify = IdOfTasks[_task_id];
+        TaskDetails memory task_to_verify = IdOfTasks[_task_id]; // The task belongs to msg.sender
 
-        bytes32 hashed_message_for_verify = _getHashValue(msg.sender, task_to_verify.task_message);
-        bytes32 signed_message_for_verify = task_to_verify.sign_msg;
+        bytes32 hashed_message_for_verify = _getHashValue(msg.sender, task_to_verify.task_id);
+        bytes32 stored_signed_message_for_verify = task_to_verify.sign_msg;
+        require(SignedMessageToOwner[stored_signed_message_for_verify] == msg.sender, "We have not your task sign");
 
-        bytes32 verified_signer_message = hashed_message_for_verify.toEthSignedMessageHash();
+        address _recovered = stored_signed_message_for_verify.recover(_metamask_sign);
 
-        address signer = ecrecover(verified_signer_message, _v, _r, _s);
-
-        require(SignedMessageToOwner[verified_signer_message] == signer, "We have not your task sign");
-
-        if (signer == msg.sender && verified_signer_message == signed_message_for_verify) {
+        if (_recovered == msg.sender) {
+            emit SignedMessageVerified(msg.sender, stored_signed_message_for_verify);
+        } else {
             blackList.push(msg.sender);
             revert("You are Not owner");
-        } else {
-            emit SignedMessageVerified(msg.sender, verified_signer_message);
         }
-
         _;
     }
+
 
     function CreateTask(string memory _task_msg, uint256 _task_completed_date) external returns (bool created) {
         require(!(_task_msg.equal("") && _task_completed_date == block.timestamp), "invalid values inserted");
@@ -107,7 +119,7 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
 
         uint256 task_id_gen = uint256(keccak256(abi.encodePacked(msg.sender)));
 
-        bytes32 hashed = _getHashValue(msg.sender, _task_msg);
+        bytes32 hashed = _getHashValue(msg.sender, task_id_gen);
         bytes32 SignedMessageGen = hashed.toEthSignedMessageHash();
         emit SignedMessageGenerated(msg.sender, SignedMessageGen);
 
@@ -138,21 +150,26 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
         revert("Not found");
     }
 
+
     /**
-     * NOTE: v, r, s will fetch via ethers js
+     * NOTE: MetaMask message signature will fetch via ethers js
      */
-    function removeTask(uint256 _task_id_for_remove, uint8 _v, bytes32 _r, bytes32 _s)
+    function removeTask(uint256 _task_id_for_remove, bytes memory _metamask_sign_for_verifiy)
         external
-        onlyTaskOwner(_task_id_for_remove, _v, _r, _s)
+        onlyTaskOwner(_task_id_for_remove, _metamask_sign_for_verifiy)
         returns (bool removed)
     {
         require(TaskIdActivate[_task_id_for_remove], "Task has already canceled");
-        TaskDetails memory removing_task = IdOfTasks[_task_id_for_remove];
+        TaskDetails storage removing_task = IdOfTasks[_task_id_for_remove];
         require(removing_task.task_status != TASK_STATUS.CANCELED, "task has already canceled");
 
+        /** MODIFICATIONS (Just for vitals data) */
         removing_task.task_status = TASK_STATUS.CANCELED;
 
+        TaskIdActivate[removing_task.task_id] = false;
+
         uint256 task_index = _FindTaskFromTaskOwnershipList(_task_id_for_remove);
+        // modify(delete) the task belong to list of msg.sender's tasks 
         TasksOwnershipList[msg.sender][task_index] = TasksOwnershipList[msg.sender][TasksOwnershipList[msg.sender].length - 1];
         TasksOwnershipList[msg.sender].pop();
 
@@ -162,19 +179,19 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
 
 
     /**
-     * NOTE: v, r, s will fetch via ethers js
+     * NOTE: Update function will also be used at remove and complete functions.
      */
     /**
      * NOTE: for passing value input if you don't want to update, pass zero value if that type
      */
+     /* 0 -> update task details  |  1 -> complete task  |  2 -> remove task */
     function updateTask(
         string memory _new_msg,
-        uint256 _new_time,
-        uint256 _task_id_for_update,
-        uint8 _v,
-        bytes32 _r,
-        bytes32 _s
-    ) external onlyTaskOwner(_task_id_for_update, _v, _r, _s) returns (bool updated) {
+        uint _new_time,
+        uint _task_id_for_update,
+        bytes memory _metamask_sign_for_verifiy
+    ) external onlyTaskOwner(_task_id_for_update, _metamask_sign_for_verifiy) 
+    returns (bool updated) {
 
         TaskDetails memory updating_task = IdOfTasks[_task_id_for_update];
         uint256 task_idx = _FindTaskFromTaskOwnershipList(_task_id_for_update);
@@ -204,12 +221,21 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
     }
 
 
+    function CompleteTask(uint _task_id_for_complete, bytes memory _metamask_task_signature) 
+    external 
+    onlyTaskOwner(_task_id_for_complete,_metamask_task_signature) 
+    nonReentrant
+    returns(bool completed) {
+        require(TaskIdActivate[_task_id_for_complete] == true, "Task has already canceled");
 
-    // function CompleteTask(uint _task_id_for_complete, uint8 _v, bytes32 _r, bytes32 _s) external onlyTaskOwner(_task_id_for_complete, _v, _r,) returns(bool completed) {
-    //     require(TaskIdActivate[_task_id_for_complete] == true, "Task has already canceled");
 
-    // }
-
+        bool removed = this.removeTask(_task_id_for_complete, _metamask_task_signature);
+        // rewarding to the owner
+        bool rewarded = _GetTaskCompletedReward(msg.sender, 10);
+        require(removed && rewarded, "Something went wrong in reward function");
+        emit OwnerRewarded(msg.sender, _task_id_for_complete, 10);
+        completed = rewarded;
+    }
 
 
     function _GetTaskCompletedReward(address _to, uint256 _amount)
