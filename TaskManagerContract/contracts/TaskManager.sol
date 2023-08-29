@@ -71,6 +71,7 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
         TaskTitle = _task_title;
         token = TaskToken(0xE88d965e34D08df39F98301D24a79Ef736De4e4c);
         OWNER = msg.sender;
+        _mint(OWNER, 10000);
     }
 
     function _getHashValue(address _owner, uint _tsk_id) internal pure returns (bytes32 hashed) {
@@ -112,12 +113,11 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
         _;
     }
 
-
     function CreateTask(string memory _task_msg, uint256 _task_completed_date) external returns (bool created) {
         require(!(_task_msg.equal("") && _task_completed_date == block.timestamp), "invalid values inserted");
         require(!(TaskMessageUsed[_task_msg]), "This message of task has already used");
 
-        uint256 task_id_gen = uint256(keccak256(abi.encodePacked(msg.sender)));
+        uint256 task_id_gen = uint256(keccak256(abi.encodePacked(msg.sender))).mod(10000);
 
         bytes32 hashed = _getHashValue(msg.sender, task_id_gen);
         bytes32 SignedMessageGen = hashed.toEthSignedMessageHash();
@@ -127,14 +127,19 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
             msg.sender,
             task_id_gen,
             _task_msg,
-            block.timestamp,
+            block.timestamp,    
             _task_completed_date,
             TASK_STATUS.PENDING,
             SignedMessageGen
         );
 
+        // Mappings data adding
         TasksOwnershipList[new_task.task_owner].push(new_task);
         TaskIdActivate[task_id_gen] = true;
+        IdOfTasks[task_id_gen] = new_task;
+        TaskIdActivate[task_id_gen] = true;
+        TaskMessageUsed[_task_msg] = true;
+        SignedMessageToOwner[SignedMessageGen] = msg.sender;
 
         emit TaskCreated(new_task.task_owner, new_task.task_id);
 
