@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity 0.8.21;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
@@ -73,7 +73,7 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
     }
 
     function _getHashValue(address _owner, string memory _msg) internal view returns (bytes32 hashed) {
-        return keccak256(abi.encodePacked(_msg, msg.sender));
+        return keccak256(abi.encodePacked(_msg, _owner));
     }
 
     modifier onlyTaskOwner(uint256 _task_id, uint8 _v, bytes32 _r, bytes32 _s) {
@@ -153,13 +153,13 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
         removing_task.task_status = TASK_STATUS.CANCELED;
 
         uint256 task_index = _FindTaskFromTaskOwnershipList(_task_id_for_remove);
-        TasksOwnershipList[msg.sender][task_index] =
-            TasksOwnershipList[msg.sender][TasksOwnershipList[msg.sender].length - 1];
+        TasksOwnershipList[msg.sender][task_index] = TasksOwnershipList[msg.sender][TasksOwnershipList[msg.sender].length - 1];
         TasksOwnershipList[msg.sender].pop();
 
         emit TaskRemoved(removing_task.task_owner, removing_task.task_id);
         removed = true;
     }
+
 
     /**
      * NOTE: v, r, s will fetch via ethers js
@@ -175,7 +175,8 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
         bytes32 _r,
         bytes32 _s
     ) external onlyTaskOwner(_task_id_for_update, _v, _r, _s) returns (bool updated) {
-        TaskDetails storage updating_task = IdOfTasks[_task_id_for_update];
+
+        TaskDetails memory updating_task = IdOfTasks[_task_id_for_update];
         uint256 task_idx = _FindTaskFromTaskOwnershipList(_task_id_for_update);
 
         require(!(updating_task.task_message.equal(_new_msg)), "message not new");
@@ -202,10 +203,14 @@ contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
         revert("There is no new value for update");
     }
 
+
+
     // function CompleteTask(uint _task_id_for_complete, uint8 _v, bytes32 _r, bytes32 _s) external onlyTaskOwner(_task_id_for_complete, _v, _r,) returns(bool completed) {
     //     require(TaskIdActivate[_task_id_for_complete] == true, "Task has already canceled");
 
     // }
+
+
 
     function _GetTaskCompletedReward(address _to, uint256 _amount)
         internal
