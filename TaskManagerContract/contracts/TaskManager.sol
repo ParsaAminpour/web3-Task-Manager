@@ -17,6 +17,7 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import {MessageHashUtils} from "./Signature.sol";
 import { Signature } from "./Signature.sol";
 import "./TaskToken.sol";
+import "../interfaces/ITaskManager.sol";
 
 contract TaskManager is Ownable, ReentrancyGuard, TaskToken {
     // using SignatureChecker for bytes32;
