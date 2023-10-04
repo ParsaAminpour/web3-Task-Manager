@@ -25,6 +25,7 @@ export const TaskReducer = (state: Task[] , action: ActionType): any => {
             state.map(task => {
                 if (task == action.data) task.task_status = true;
             });
+
             return state;    
 
         case ACTION.REMOVE:
@@ -71,7 +72,7 @@ export const Task = ():React.ReactNode => {
                 Add
             </button>
         </div>
-
+        
         <div className="clear-buttons">
             <button className="clear-all" onClick={() => dispatch({
                 type: ACTION.CLEAR,
@@ -87,7 +88,8 @@ export const Task = ():React.ReactNode => {
             {state.map((task:Task) => (
             <li>
               <div className="task">
-                <span key={task.task_primary_id}>{task.task_message}</span>
+                <span style={{textDecoration: task.task_status ? 'line-through' : 'none'}}
+                    key={task.task_primary_id}>{task.task_message}</span>
 
                 <div className="buttons">
 
