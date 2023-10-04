@@ -13,7 +13,7 @@ export enum ACTION {
 }
 export type ActionType = {
     type: ACTION;
-    data: Task | string
+    data?: Task | string;
 }
 
 export const TaskReducer = (state: Task[] , action: ActionType): any => {
@@ -28,13 +28,13 @@ export const TaskReducer = (state: Task[] , action: ActionType): any => {
             return state;    
 
         case ACTION.REMOVE:
-            state.filter(task => {
-                task != action.data;
+            const new_list = state.filter(task => {
+                return task != action.data;
             })
-            return [action?.data]
+            return new_list;
         
         case ACTION.CLEAR:
-            return [action.data];
+            return []
 
         default:
             throw new Error("An error occured");
@@ -43,12 +43,7 @@ export const TaskReducer = (state: Task[] , action: ActionType): any => {
 
 export const Task = ():React.ReactNode => {
 
-    const init_task_val:Task[] = [{
-        task_primary_id: "",
-        task_message: "primary task",
-        task_completed_date: new Date().getTime(),
-        task_status: false,
-    }]
+    const init_task_val:Task[] = []
 
     const [state, dispatch] = useReducer(TaskReducer, init_task_val);
     const [new_task, setNewTask] = useState("");
@@ -80,7 +75,6 @@ export const Task = ():React.ReactNode => {
         <div className="clear-buttons">
             <button className="clear-all" onClick={() => dispatch({
                 type: ACTION.CLEAR,
-                data: init_task_val[0]  
             })}>
                 Clear All
             </button>
