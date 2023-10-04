@@ -1,8 +1,7 @@
 import { useState, useReducer } from 'react'
 import "../css/Task.css"
-import {html} from "./html_base";
 
-export type Task = {
+export interface Task {
     task_primary_id: string;
     task_message: string;
     task_completed_date: number; // in timestamp
@@ -10,32 +9,29 @@ export type Task = {
     // other attrs will define on-chain
 }
 export enum ACTION {
-    CREATE, COMPLETE, REMOVE
+    CREATE, COMPLETE, REMOVE, EDIT
 }
 export type ActionType = {
     type: ACTION;
     data: Task
 }
-export type TaskList = {
-    tasks: Task[]
-}
 
-export const TaskReducer = (state: TaskList , action: ActionType): any => {
+export const TaskReducer = (state: Task[] , action: ActionType): any => {
     switch(action.type) {
         case ACTION.CREATE:
-            return [...state.tasks, action.data];
+            return [...state, action.data];
 
         case ACTION.COMPLETE:
-            state.tasks.map(task => {
+            state.map(task => {
                 if (task == action.data) task.task_status = true;
             });
-            return state.tasks;    
+            return state;    
 
         case ACTION.REMOVE:
-            state.tasks.filter(task => {
+            state.filter(task => {
                 task != action.data;
             })
-            return state.tasks;
+            return state;
 
         default:
             throw new Error("An error occured");
@@ -43,20 +39,39 @@ export const TaskReducer = (state: TaskList , action: ActionType): any => {
 }
 
 export const Task = ():React.ReactNode => {
+
     const init_task_val:Task[] = [{
         task_primary_id: "",
-        task_message: "",
+        task_message: "primary task",
         task_completed_date: new Date().getTime(),
         task_status: false,
     }]
 
     const [state, dispatch] = useReducer(TaskReducer, init_task_val);
+    const [new_task, setNewTask] = useState("");
+
+    const AddNewTask = () => {
+        dispatch({
+            type: ACTION.CREATE,
+            data: {
+                task_message: new_task,
+                task_completed_date: new Date().getTime() + 1000,
+                task_primary_id: crypto.randomUUID(),
+                task_status: false,
+                }   
+        })
+        setNewTask("");
+    }
 
     return (
       <>
         <div className="task-input">
-            <input type="text" placeholder="Add a new task..." />
-            <button className="add">Add</button>
+            <input type="text" placeholder="Add a new task..." 
+                value={new_task} onChange={(e) => setNewTask(e.target.value)}/>
+
+            <button className="add" onClick={AddNewTask}>
+                Add
+            </button>
         </div>
 
         <div className="clear-buttons">
@@ -65,15 +80,27 @@ export const Task = ():React.ReactNode => {
         </div>
 
         <ul className="task-list">
+            {state.map((task:Task) => (
             <li>
               <div className="task">
-                <span>Task 1</span>
+                <span key={task.task_primary_id}>{task.task_message}</span>
+
                 <div className="buttons">
-                  <button className="remove">Remove</button>
-                  <button className="edit">Edit</button>
+
+                    <button className="remove" 
+                        onClick={() => dispatch({type: ACTION.REMOVE, data: task})}> 
+                    Remove
+                  </button>
+                  
+                  <button className="edit"
+                        onClick={() => dispatch({type:ACTION.COMPLETE, data: task})}>
+                    Complete
+                </button>
+
                 </div>
               </div>
             </li>
+            ))}
         </ul>
       </>
     )
