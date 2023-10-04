@@ -1,0 +1,89 @@
+/* Task Input */
+
+.task-input {
+	background: #fff;
+	padding: 20px;
+	border-radius: 10px;
+	box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  
+  .task-input input {
+	width: 75%;
+	padding: 12px;
+	border: 2px solid #ddd;
+	border-radius: 4px;
+	font-size: 16px;
+  }
+  
+  .task-input button {
+	width: 20%;
+	padding: 12px;
+	background: #4caf50;
+	color: #fff;
+	border: none;
+	border-radius: 4px;
+	font-size: 16px;
+  }
+  
+  
+  /* Clear Buttons */
+  
+  .clear-buttons {
+	margin-top: 20px;
+	text-align: center; 
+  }
+  
+  .clear-buttons button {
+	padding: 10px 20px;
+	border-radius: 4px;
+	background: #f44336; 
+	color: #fff;
+	border: none;
+	font-size: 16px;
+	margin: 0 10px;
+  }
+  
+  .clear-buttons .clear-completed {
+	background: #777;
+  }
+
+  /* Task List */
+
+.task-list {
+	list-style: none;
+	padding: 0;
+  }
+  
+  .task {
+	background: #fff;
+	padding: 20px;
+	border-radius: 10px;
+	box-shadow: 0 4px 10px rgba(0,0,0,0.1);  
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 10px;
+  }
+  
+  .task .buttons {
+	display: flex;
+  }
+  
+  .task .buttons button {
+	margin-left: 10px;
+	padding: 6px 10px;
+	border-radius: 4px;
+	border: none;
+	color: #fff;
+	font-size: 14px;  
+  }
+  
+  .task .buttons .remove {
+	background: #f44336;
+  }
+  
+  .task .buttons .edit {
+	background: #4caf50;
+  }
+  
+  /* Task List */
