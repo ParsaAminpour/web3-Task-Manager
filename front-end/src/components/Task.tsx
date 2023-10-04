@@ -9,17 +9,17 @@ export interface Task {
     // other attrs will define on-chain
 }
 export enum ACTION {
-    CREATE, COMPLETE, REMOVE, EDIT
+    CREATE, COMPLETE, REMOVE, EDIT, CLEAR
 }
 export type ActionType = {
     type: ACTION;
-    data: Task
+    data: Task | string
 }
 
 export const TaskReducer = (state: Task[] , action: ActionType): any => {
     switch(action.type) {
         case ACTION.CREATE:
-            return [...state, action.data];
+            return [...state, action?.data];
 
         case ACTION.COMPLETE:
             state.map(task => {
@@ -31,7 +31,10 @@ export const TaskReducer = (state: Task[] , action: ActionType): any => {
             state.filter(task => {
                 task != action.data;
             })
-            return state;
+            return [action?.data]
+        
+        case ACTION.CLEAR:
+            return [action.data];
 
         default:
             throw new Error("An error occured");
@@ -75,9 +78,16 @@ export const Task = ():React.ReactNode => {
         </div>
 
         <div className="clear-buttons">
-            <button className="clear-all">Clear All</button>
+            <button className="clear-all" onClick={() => dispatch({
+                type: ACTION.CLEAR,
+                data: init_task_val[0]  
+            })}>
+                Clear All
+            </button>
+
             <button className="clear-completed">Clear Completed</button> 
         </div>
+
 
         <ul className="task-list">
             {state.map((task:Task) => (
